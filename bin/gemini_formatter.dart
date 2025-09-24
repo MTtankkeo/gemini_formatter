@@ -27,11 +27,13 @@ Directory findPackageRoot(Directory startDir) {
 }
 
 void main(List<String> arguments) {
+  // Load configuration file, defaulting to gemini_formatter.yaml.
   final configPath = arguments.firstOrNull;
   final configFile = File(configPath ?? "gemini_formatter.yaml");
   final yamlString = configFile.readAsStringSync();
   final config = loadYaml(yamlString);
 
+  // Validate required config fields.
   if (config["apiKey"] == "") {
     throw Exception("API Key is missing. Please set 'apiKey' in your config file.");
   }
@@ -48,6 +50,7 @@ void main(List<String> arguments) {
     throw Exception("Prompts directory is missing. Please set 'promptsDir' in your config file.");
   }
 
+  // Load input files and prompt templates.
   final inputDir = Directory(config["inputDir"]);
   final inputFiles = SourceFileBinding.load(inputDir);
 
@@ -66,28 +69,34 @@ void main(List<String> arguments) {
       model: config["model"],
     );
 
+    // Combine all system-level prompts. (constraints + templates)
     final systemPrompts = [
       ...constraintsFiles,
       ...promptsFiles,
     ].map((e) => e.text).join("\n\n");
 
+    // Process each input file individually.
     for (var file in inputFiles) {
       final stopwatchFile = Stopwatch()..start();
 
+      // Include all files as context for the AI.
       final sourcePrompts = inputFiles.map((file) {
         return "----------[FILE: ${file.path}]----------"
               "\n${file.text}\n"
               "----------[END FILE]----------";
       }).join("\n\n");
 
+      // Prepare AI request for current files.
       final contents = [
         Content.text(systemPrompts),
         Content.text(sourcePrompts),
         Content.text("Must add comments to this specific file: ${file.path}"),
       ];
 
+      // Generate AI output.
       final response = await model.generateContent(contents);
 
+      // Write AI-annotated content back to file.
       final annotatedFile = File(file.path);
       final cleanupedText = removeCodeFences(response.text!);
       annotatedFile.writeAsStringSync(cleanupedText);
@@ -96,7 +105,7 @@ void main(List<String> arguments) {
 
       print("${file.path} has been formatted by the AI in ${stopwatchFile.elapsed.inSeconds} seconds.");
 
-      // Apply delay between requests.
+      // Apply optional delay between requests to respect rate limits.
       if (config["requestDelaySeconds"] != null
        && config["requestDelaySeconds"] != 0) {
         final int delaySeconds = config["requestDelaySeconds"];
