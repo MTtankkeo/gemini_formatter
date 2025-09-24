@@ -1,0 +1,14 @@
+# Your Gemini API Key for authentication.
+apiKey: "..."
+
+# The AI model to use for formatting and commenting.
+model: "gemini-2.5-pro"
+
+# Directory containing files that the AI will process.
+inputDir: "./lib"
+
+# Directory containing AI prompt templates.
+promptsDir: "./formatter/prompts"
+
+# Delay between AI requests in seconds to avoid quota exceeded errors.
+requestDelaySeconds: 60

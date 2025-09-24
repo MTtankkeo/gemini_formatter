@@ -1,14 +1,12 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:gemini_formatter/source_file.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:gemini_formatter/source_file_binding.dart';
 import 'package:yaml/yaml.dart';
 import 'package:path/path.dart';
 
-/// Cleans JSON-like text by removing Markdown code fences.
-String cleanJson(String text) {
+/// Cleans AI output texts by removing Markdown code fences.
+String removeCodeFences(String text) {
   return text.replaceAll(RegExp(r'```[a-zA-Z]*\n?'), '').replaceAll('```', '');
 }
 
@@ -22,8 +20,7 @@ Directory findPackageRoot(Directory startDir) {
       return dir;
     }
     if (dir.parent.path == dir.path) {
-      // 루트까지 올라왔는데도 pubspec.yaml 없음
-      throw Exception('패키지 루트를 찾을 수 없습니다.');
+      throw Exception('The package root not found.');
     }
     dir = dir.parent;
   }
@@ -61,6 +58,8 @@ void main(List<String> arguments) {
   final constraintsDir = Directory(join(packageDir.path, "./prompts"));
   final constraintsFiles = SourceFileBinding.load(constraintsDir);
 
+  final stopwatchTotal = Stopwatch()..start(); // 전체 시간 측정
+
   () async {
     final model = GenerativeModel(
       apiKey: config["apiKey"],
@@ -72,26 +71,42 @@ void main(List<String> arguments) {
       ...promptsFiles,
     ].map((e) => e.text).join("\n\n");
 
-    final sourcePrompts = inputFiles.map((file) {
-      return "----------[FILE: ${file.path}]----------"
-             "\n${file.text}\n"
-             "----------[END FILE]----------";
-    }).join("\n\n");
+    for (var file in inputFiles) {
+      final stopwatchFile = Stopwatch()..start();
 
-    final contents = [
-      Content.text(systemPrompts),
-      Content.text(sourcePrompts),
-    ];
+      final sourcePrompts = inputFiles.map((file) {
+        return "----------[FILE: ${file.path}]----------"
+              "\n${file.text}\n"
+              "----------[END FILE]----------";
+      }).join("\n\n");
 
-    final response = await model.generateContent(contents);
-    final jsonList = jsonDecode(cleanJson(response.text!)) as List;
-    final jsonFile = jsonList.map((json) => SourceFile.fromJson(json));
+      final contents = [
+        Content.text(systemPrompts),
+        Content.text(sourcePrompts),
+        Content.text("Must add comments to this specific file: ${file.path}"),
+      ];
 
-    for (var output in jsonFile) {
-      final file = File(output.path);
-      file.writeAsStringSync(output.text);
+      final response = await model.generateContent(contents);
+
+      final annotatedFile = File(file.path);
+      final cleanupedText = removeCodeFences(response.text!);
+      annotatedFile.writeAsStringSync(cleanupedText);
+      stopwatchFile.stop();
+      file.text = cleanupedText;
+
+      print("${file.path} has been formatted by the AI in ${stopwatchFile.elapsed.inSeconds} seconds.");
+
+      // Apply delay between requests.
+      if (config["requestDelaySeconds"] != null
+       && config["requestDelaySeconds"] != 0) {
+        final int delaySeconds = config["requestDelaySeconds"];
+        print("Waiting for $delaySeconds seconds before formatting...");
+
+        await Future.delayed(Duration(seconds: delaySeconds));
+      }
     }
 
-    print("A total of ${jsonFile.length} files have been formatted by the AI.");
+    stopwatchTotal.stop();
+    print("All files formatted in ${stopwatchTotal.elapsed.inSeconds} seconds.");
   }();
 }
