@@ -33,4 +33,24 @@ class SourceFileBinding {
     collectFiles(entryDir);
     return files;
   }
+
+  /// Handles a given file system [path] by calling the appropriate callback.
+  static void handlePath({
+    required String path,
+    required Function(File) onFile,
+    required Function(Directory) onDirectory,
+  }) {
+    final entity = FileSystemEntity.typeSync(path);
+
+    switch (entity) {
+      case FileSystemEntityType.file:
+        onFile(File(path)); break;
+
+      case FileSystemEntityType.directory:
+        onDirectory(Directory(path)); break;
+
+      default:
+        throw Exception("The path does not exist: $path");
+    }
+  }
 }

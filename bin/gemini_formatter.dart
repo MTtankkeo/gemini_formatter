@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:args/args.dart';
+import 'package:gemini_formatter/source_file.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:gemini_formatter/source_file_binding.dart';
 import 'package:yaml/yaml.dart';
@@ -27,26 +29,36 @@ Directory findPackageRoot(Directory startDir) {
 }
 
 void main(List<String> arguments) {
+  final argParser = ArgParser()
+    ..addOption(
+      "config",
+      abbr: "c",
+      help: "Path to config file",
+      defaultsTo: "gemini_formatter.yaml",
+      mandatory: false
+    );
+
+  final argResults = argParser.parse(arguments);
+
   // Load configuration file, defaulting to gemini_formatter.yaml.
-  final configPath = arguments.firstOrNull;
-  final configFile = File(configPath ?? "gemini_formatter.yaml");
+  final configPath = argResults["config"];
+  final configFile = File(configPath);
   final yamlString = configFile.readAsStringSync();
   final config = loadYaml(yamlString);
 
   // Validate required config fields.
-  if (config["apiKey"] == "") {
+  if (config["apiKey"] == null
+   || config["apiKey"] == "") {
     throw Exception("API Key is missing. Please set 'apiKey' in your config file.");
   }
 
-  if (config["model"] == "") {
+  if (config["model"] == null
+   || config["model"] == "") {
     throw Exception("AI model is missing. Please set 'model' in your config file.");
   }
 
-  if (config["inputDir"] == "") {
-    throw Exception("Input directory is missing. Please set 'inputDir' in your config file.");
-  }
-
-  if (config["promptsDir"] == "") {
+  if (config["promptsDir"] == null
+   || config["promptsDir"] == "") {
     throw Exception("Prompts directory is missing. Please set 'promptsDir' in your config file.");
   }
 
@@ -61,7 +73,30 @@ void main(List<String> arguments) {
   final constraintsDir = Directory(join(packageDir.path, "./prompts"));
   final constraintsFiles = SourceFileBinding.load(constraintsDir);
 
-  final stopwatchTotal = Stopwatch()..start(); // 전체 시간 측정
+  // List of files to be formatted.
+  final processFiles = <SourceFile>[];
+
+  // Load process files from command-line argument.
+  if (arguments.firstOrNull != null) {
+    SourceFileBinding.handlePath(
+      path: arguments.firstOrNull!,
+
+      // Read the file content and add as a SourceFile.
+      onFile: (file) {
+        final source = SourceFile(path: file.path, text: file.readAsStringSync());
+        processFiles.add(source);
+      },
+
+      // Load all files from the directory and add them to inputFiles.
+      onDirectory: (dir) {
+        processFiles.addAll(SourceFileBinding.load(dir));
+      }
+    );
+  } else {
+    processFiles.addAll(inputFiles);
+  }
+
+  final stopwatchTotal = Stopwatch()..start();
 
   () async {
     final model = GenerativeModel(
@@ -76,7 +111,9 @@ void main(List<String> arguments) {
     ].map((e) => e.text).join("\n\n");
 
     // Process each input file individually.
-    for (var file in inputFiles) {
+    for (int i = 0; i < processFiles.length; i++) {
+      final file = processFiles[i];
+      final isLast = i == processFiles.length - 1;
       final stopwatchFile = Stopwatch()..start();
 
       // Include all files as context for the AI.
@@ -103,11 +140,14 @@ void main(List<String> arguments) {
       stopwatchFile.stop();
       file.text = cleanupedText;
 
-      print("${file.path} has been formatted by the AI in ${stopwatchFile.elapsed.inSeconds} seconds.");
+      final message = "${file.path} has been formatted by the AI in ${stopwatchFile.elapsed.inSeconds} seconds.";
+      final current = "(${i + 1}/${processFiles.length})";
+      print("$message $current");
 
       // Apply optional delay between requests to respect rate limits.
       if (config["requestDelaySeconds"] != null
-       && config["requestDelaySeconds"] != 0) {
+       && config["requestDelaySeconds"] != 0
+       && isLast == false) {
         final int delaySeconds = config["requestDelaySeconds"];
         print("Waiting for $delaySeconds seconds before formatting...");
 
