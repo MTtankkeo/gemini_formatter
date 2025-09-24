@@ -12,7 +12,7 @@ String cleanJson(String text) {
 
 void main(List<String> arguments) {
   final configPath = arguments.firstOrNull;
-  final configFile = File(configPath ?? "config.yaml");
+  final configFile = File(configPath ?? "gemini_formatter.yaml");
   final yamlString = configFile.readAsStringSync();
   final config = loadYaml(yamlString);
 
