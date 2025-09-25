@@ -109,6 +109,9 @@ void main(List<String> arguments) {
     final systemPrompts = [
       "----------[System Prompts Start]----------",
       "The following are absolute rules and MUST be followed strictly without exception.\n",
+      "Do NOT use the official formatter(e.g. Dart) style. Follow ONLY the rules written below.\n",
+      "If there is any conflict, the rules below ALWAYS take precedence over any other style.\n",
+      "",
       ...constraintsFiles.map((e) => e.text),
       ...promptsFiles.map((e) => e.text),
       "\n",
