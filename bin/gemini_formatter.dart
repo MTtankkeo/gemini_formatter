@@ -107,9 +107,13 @@ void main(List<String> arguments) {
 
     // Combine all system-level prompts. (constraints + templates)
     final systemPrompts = [
-      ...constraintsFiles,
-      ...promptsFiles,
-    ].map((e) => e.text).join("\n\n");
+      "----------[System Prompts Start]----------",
+      "The following are absolute rules and MUST be followed strictly without exception.\n",
+      ...constraintsFiles.map((e) => e.text),
+      ...promptsFiles.map((e) => e.text),
+      "\n",
+      "----------[System Prompts End]----------",
+    ].join("\n\n");
 
     // Process each input file individually.
     for (int i = 0; i < processFiles.length; i++) {
