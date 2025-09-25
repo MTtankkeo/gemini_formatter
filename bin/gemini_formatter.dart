@@ -97,6 +97,7 @@ void main(List<String> arguments) {
   }
 
   final stopwatchTotal = Stopwatch()..start();
+  final includeOtherInputs = (config["includeOtherInputs"] as bool?) ?? true;
 
   () async {
     final model = GenerativeModel(
@@ -116,12 +117,16 @@ void main(List<String> arguments) {
       final isLast = i == processFiles.length - 1;
       final stopwatchFile = Stopwatch()..start();
 
+      String convertToContext(SourceFile source) {
+        return "----------[FILE: ${source.path}]----------"
+               "\n${source.text}\n"
+               "----------[END FILE]----------";
+      }
+
       // Include all files as context for the AI.
-      final sourcePrompts = inputFiles.map((file) {
-        return "----------[FILE: ${file.path}]----------"
-              "\n${file.text}\n"
-              "----------[END FILE]----------";
-      }).join("\n\n");
+      final sourcePrompts = includeOtherInputs
+        ? inputFiles.map(convertToContext).join("\n\n")
+        : convertToContext(file);
 
       // Prepare AI request for current files.
       final contents = [

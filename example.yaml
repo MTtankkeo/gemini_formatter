@@ -12,3 +12,8 @@ promptsDir: "./formatter/prompts"
 
 # Delay between AI requests in seconds to avoid quota exceeded errors.
 requestDelaySeconds: 60
+
+# Whether to include other input files as context when formatting.
+# If true, all input files are provided as additional context to help the AI 
+# understand the overall project. If false, only the target file is used.
+includeOtherInputs: true
