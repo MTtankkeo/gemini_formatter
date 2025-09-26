@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:gemini_formatter/source_file.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:gemini_formatter/worker_manager.dart';
 import 'package:gemini_formatter/source_file_binding.dart';
 import 'package:yaml/yaml.dart';
 import 'package:path/path.dart';
@@ -48,7 +48,8 @@ void main(List<String> arguments) {
 
   // Validate required config fields.
   if (config["apiKey"] == null
-   || config["apiKey"] == "") {
+   || config["apiKey"] == ""
+   || config["apiKey"] == []) {
     throw Exception("API Key is missing. Please set 'apiKey' in your config file.");
   }
 
@@ -57,14 +58,19 @@ void main(List<String> arguments) {
     throw Exception("AI model is missing. Please set 'model' in your config file.");
   }
 
+  if (config["contextDir"] == null
+   || config["contextDir"] == "") {
+    throw Exception("Prompts directory is missing. Please set 'contextDir' in your config file.");
+  }
+
   if (config["promptsDir"] == null
    || config["promptsDir"] == "") {
     throw Exception("Prompts directory is missing. Please set 'promptsDir' in your config file.");
   }
 
-  // Load input files and prompt templates.
-  final inputDir = Directory(config["inputDir"]);
-  final inputFiles = SourceFileBinding.load(inputDir);
+  // Load context files and prompt templates.
+  final contextDir = Directory(config["contextDir"]);
+  final contextFiles = SourceFileBinding.load(contextDir);
 
   final promptsDir = Directory(config["promptsDir"]);
   final promptsFiles = SourceFileBinding.load(promptsDir);
@@ -73,8 +79,23 @@ void main(List<String> arguments) {
   final constraintsDir = Directory(join(packageDir.path, "./prompts"));
   final constraintsFiles = SourceFileBinding.load(constraintsDir);
 
+  final apiKeys = <String>[];
+
   // List of files to be formatted.
   final processFiles = <SourceFile>[];
+
+  // Add API keys from the config, supporting both single string and list of strings.
+  if (config["apiKey"] is String) {
+    apiKeys.add(config["apiKey"]);
+  } else if (config["apiKey"] is YamlList) {
+    apiKeys.addAll((config["apiKey"] as YamlList).cast<String>());
+  } else {
+    throw Exception("Invalid or missing API Key.");
+  }
+
+  if (apiKeys.isEmpty) {
+    throw Exception("No valid API keys found.");
+  }
 
   // Load process files from command-line argument.
   if (arguments.firstOrNull != null) {
@@ -87,24 +108,22 @@ void main(List<String> arguments) {
         processFiles.add(source);
       },
 
-      // Load all files from the directory and add them to inputFiles.
+      // Load all files from the directory and add them to contextFiles.
       onDirectory: (dir) {
         processFiles.addAll(SourceFileBinding.load(dir));
       }
     );
   } else {
-    processFiles.addAll(inputFiles);
+    processFiles.addAll(contextFiles);
   }
 
-  final stopwatchTotal = Stopwatch()..start();
+  final batchSize = (config["batchSize"] as int?) ?? 1;
+  final delaySeconds = (config["requestDelaySeconds"] as int?) ?? 0;
   final includeOtherInputs = (config["includeOtherInputs"] as bool?) ?? true;
 
-  () async {
-    final model = GenerativeModel(
-      apiKey: config["apiKey"],
-      model: config["model"],
-    );
+  final stopwatchTotal = Stopwatch()..start();
 
+  () async {
     // Combine all system-level prompts. (constraints + templates)
     final systemPrompts = [
       "----------[System Prompts Start]----------",
@@ -118,54 +137,16 @@ void main(List<String> arguments) {
       "----------[System Prompts End]----------",
     ].join("\n\n");
 
-    // Process each input file individually.
-    for (int i = 0; i < processFiles.length; i++) {
-      final file = processFiles[i];
-      final isLast = i == processFiles.length - 1;
-      final stopwatchFile = Stopwatch()..start();
-
-      String convertToContext(SourceFile source) {
-        return "----------[FILE: ${source.path}]----------"
-               "\n${source.text}\n"
-               "----------[END FILE]----------";
-      }
-
-      // Include all files as context for the AI.
-      final sourcePrompts = includeOtherInputs
-        ? inputFiles.map(convertToContext).join("\n\n")
-        : convertToContext(file);
-
-      // Prepare AI request for current files.
-      final contents = [
-        Content.text(systemPrompts),
-        Content.text(sourcePrompts),
-        Content.text("Must add comments to this specific file: ${file.path}"),
-      ];
-
-      // Generate AI output.
-      final response = await model.generateContent(contents);
-
-      // Write AI-annotated content back to file.
-      final annotatedFile = File(file.path);
-      final cleanupedText = removeCodeFences(response.text!);
-      annotatedFile.writeAsStringSync(cleanupedText);
-      stopwatchFile.stop();
-      file.text = cleanupedText;
-
-      final message = "${file.path} has been formatted by the AI in ${stopwatchFile.elapsed.inSeconds} seconds.";
-      final current = "(${i + 1}/${processFiles.length})";
-      print("$message $current");
-
-      // Apply optional delay between requests to respect rate limits.
-      if (config["requestDelaySeconds"] != null
-       && config["requestDelaySeconds"] != 0
-       && isLast == false) {
-        final int delaySeconds = config["requestDelaySeconds"];
-        print("Waiting for $delaySeconds seconds before formatting...");
-
-        await Future.delayed(Duration(seconds: delaySeconds));
-      }
-    }
+    await WorkerManager(
+      apiKeys: apiKeys,
+      model: config["model"],
+      systemPrompts: systemPrompts,
+      contextFiles: contextFiles,
+      processFiles: processFiles,
+      batchSize: batchSize,
+      delaySeconds: delaySeconds,
+      includeOtherInputs: includeOtherInputs
+    ).perform();
 
     stopwatchTotal.stop();
     print("All files formatted in ${stopwatchTotal.elapsed.inSeconds} seconds.");

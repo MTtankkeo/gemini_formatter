@@ -5,15 +5,20 @@ apiKey: "..."
 model: "gemini-2.5-pro"
 
 # Directory containing files that the AI will process.
-inputDir: "./lib"
+contextDir: "./lib"
 
 # Directory containing AI prompt templates.
 promptsDir: "./formatter/prompts"
 
 # Delay between AI requests in seconds to avoid quota exceeded errors.
-requestDelaySeconds: 60
+requestDelaySeconds: 30
 
 # Whether to include other input files as context when formatting.
 # If true, all input files are provided as additional context to help the AI 
 # understand the overall project. If false, only the target file is used.
 includeOtherInputs: true
+
+# Number of requests to send concurrently for a single API key.
+# Each request processes one file, but multiple requests
+# can run at the same time.
+batchSize: 3
