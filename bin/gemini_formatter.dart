@@ -49,12 +49,14 @@ void main(List<String> arguments) {
       config["apiKey"] == "" ||
       config["apiKey"] == []) {
     throw Exception(
-        "API Key is missing. Please set 'apiKey' in your config file.");
+      "API Key is missing. Please set 'apiKey' in your config file.",
+    );
   }
 
   if (config["model"] == null || config["model"] == "") {
     throw Exception(
-        "AI model is missing. Please set 'model' in your config file.");
+      "AI model is missing. Please set 'model' in your config file.",
+    );
   }
 
   if (config["contextDir"] == null || config["contextDir"] == "") {
@@ -79,6 +81,10 @@ void main(List<String> arguments) {
 
   // List of files to be formatted.
   final processFiles = <SourceFile>[];
+
+  // List of file extensions that should be ignored by the formatter.
+  // If the config does not specify any, defaults to an empty list.
+  final ignoreExtensions = config["ignoreExtensions"] ?? <String>[];
 
   // Add API keys from the config, supporting both single string and list of strings.
   if (config["apiKey"] is String) {
@@ -107,7 +113,8 @@ void main(List<String> arguments) {
 
       // Load all files from the directory and add them to contextFiles.
       onDirectory: (dir) {
-        processFiles.addAll(SourceFileBinding.load(dir));
+        processFiles.addAll(
+            SourceFileBinding.load(dir, ignoreExtensions: ignoreExtensions));
       },
     );
   } else {

@@ -22,3 +22,8 @@ includeOtherInputs: true
 # Each request processes one file, but multiple requests
 # can run at the same time.
 batchSize: 3
+
+# File extensions that the formatter should ignore.
+# Files with these extensions will not be processed for formatting or commenting.
+ignoreExtensions:
+  - ".g.dart" # Generated Dart files, usually auto-generated, so skip formatting.

@@ -6,7 +6,10 @@ class SourceFileBinding {
   /// Recursively loads all files under [entryDir] and
   /// returns them as a list of [SourceFile] instances.
   /// Throws an exception if [entryDir] does not exist.
-  static List<SourceFile> load(Directory entryDir) {
+  static List<SourceFile> load(
+    Directory entryDir, {
+    List<String> ignoreExtensions = const [],
+  }) {
     if (!entryDir.existsSync()) {
       throw Exception("Directory '${entryDir.path}' does not exist.");
     }
@@ -17,6 +20,9 @@ class SourceFileBinding {
     void collectFiles(Directory dir) {
       for (var entity in dir.listSync()) {
         if (entity is File) {
+          final ignored = ignoreExtensions.any((e) => entity.path.endsWith(e));
+          if (ignored) continue;
+
           // Read file content and create a SourceFile instance
           final content = entity.readAsStringSync();
           files.add(SourceFile(path: entity.path, text: content));
@@ -47,6 +53,9 @@ class SourceFileBinding {
       case FileSystemEntityType.directory:
         onDirectory(Directory(path));
         break;
+
+      case FileSystemEntityType.notFound:
+        throw Exception("The path does not exist: $path");
 
       default:
         throw Exception("The path does not exist: $path");
