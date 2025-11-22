@@ -139,6 +139,7 @@ void main(List<String> arguments) {
       "4. ONLY adjust formatting or add comments to improve readability. No other modifications are allowed.",
       "5. The code’s functionality must remain 100% identical to the original.",
       "6. Output only the raw code, without Markdown code blocks (```) or JSON wrapping.",
+      "7. DO NOT include any delimiters or markers such as '----------[System Prompts End]----------' in the output. Only output the file contents.",
       "",
       ...promptsFiles.map((e) => e.text),
       "\n",
@@ -146,15 +147,15 @@ void main(List<String> arguments) {
     ].join("\n\n");
 
     await WorkerManager(
-            apiKeys: apiKeys,
-            model: config["model"],
-            systemPrompts: systemPrompts,
-            contextFiles: contextFiles,
-            processFiles: processFiles,
-            batchSize: batchSize,
-            delaySeconds: delaySeconds,
-            includeOtherInputs: includeOtherInputs)
-        .perform();
+      apiKeys: apiKeys,
+      model: config["model"],
+      systemPrompts: systemPrompts,
+      contextFiles: contextFiles,
+      processFiles: processFiles,
+      batchSize: batchSize,
+      delaySeconds: delaySeconds,
+      includeOtherInputs: includeOtherInputs,
+    ).perform();
 
     stopwatchTotal.stop();
     print(
