@@ -7,7 +7,8 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 /// Signature for the callback that is invoked when a file
 /// has been processed by a Worker, providing the file and
 /// the elapsed processing time.
-typedef WorkerCompletedCallback = void Function(SourceFile file, Duration elapsed);
+typedef WorkerCompletedCallback = void Function(
+    SourceFile file, Duration elapsed);
 
 /// Cleans AI output texts by removing Markdown code fences.
 String removeCodeFences(String text) {
@@ -47,19 +48,20 @@ class Worker {
   }
 
   /// Process a single file with this API key.
-  Future<void> _processFile(SourceFile file, WorkerCompletedCallback onCompleted) async {
+  Future<void> _processFile(
+      SourceFile file, WorkerCompletedCallback onCompleted) async {
     final stopwatchFile = Stopwatch()..start();
 
     String convertToContext(SourceFile source) {
       return "----------[FILE: ${source.path}]----------"
-              "\n${source.text}\n"
-              "----------[END FILE]----------";
+          "\n${source.text}\n"
+          "----------[END FILE]----------";
     }
 
     // Include all files as context for the AI or just the current file.
     final contextPrompts = includeOtherInputs
-      ? contextFiles.map(convertToContext).join("\n\n")
-      : convertToContext(file);
+        ? contextFiles.map(convertToContext).join("\n\n")
+        : convertToContext(file);
 
     // Prepare AI request for current file.
     final contents = [

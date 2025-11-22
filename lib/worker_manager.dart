@@ -78,7 +78,8 @@ class WorkerManager {
 
       // Apply delay per API key after each batch.
       if (queue.isNotEmpty && delaySeconds > 0) {
-        print("API Key ${worker.apiKey.substring(0, 8)}... waiting for $delaySeconds seconds...");
+        print(
+            "API Key ${worker.apiKey.substring(0, 8)}... waiting for $delaySeconds seconds...");
         await Future.delayed(Duration(seconds: delaySeconds));
       }
     }
@@ -88,7 +89,8 @@ class WorkerManager {
   /// logs progress with elapsed time.
   void onCompleted(SourceFile file, Duration elapsed) {
     completedCount += 1;
-    final message = "${file.path} has been formatted by AI in ${elapsed.inSeconds} seconds.";
+    final message =
+        "${file.path} has been formatted by AI in ${elapsed.inSeconds} seconds.";
     final current = "($completedCount/${processFiles.length})";
     print("$message $current");
   }
