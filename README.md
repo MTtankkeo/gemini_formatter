@@ -1,9 +1,9 @@
 ### Install
-```dart
+```bash
 dart pub global activate --source git https://github.com/MTtankkeo/gemini_formatter.git
 ```
 
 ### Running
-```dart
+```bash
 dart pub global run gemini_formatter
 ```
